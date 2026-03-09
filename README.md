@@ -1,78 +1,69 @@
-﻿# XDV Q Hardware Provider Interface
+# XDV Q Hardware Provider Interface
 
 Version: 0.1.0
-Status: planned
+Status: active
 Language: Dust Programming Language (DPL)
 
 ## Specification Alignment
 
-Primary specification: XDV-060 in xdv-spec.
+Primary specification: XDV-060 in `xdv-spec`.
+
+Implemented focus for this milestone:
+
+1. Provider registration and attestation flow.
+2. Calibration contract and Q job submission protocol.
+3. Deterministic error mapping and escalation behavior tests.
 
 ## Purpose
 
-Provider interface for Q-domain calibration, jobs, and error reporting.
+Q-domain hardware provider boundary for deterministic, contract-validated execution.
 
-## Scope
+## Modules
 
-This project is responsible for:
+- `src/qhpi_contracts.ds`
+  Normative status/error constants and validation for providers, calibration windows, measurement spec, and decoherence budget.
 
-- Implementing normative requirements defined by XDV-060.
-- Publishing deterministic behavior contracts for integration with xdv-os.
-- Providing reusable modules for cross-repo integration.
-- Supplying verification and conformance fixtures for regression control.
+- `src/qhpi_provider.ds`
+  Provider registration, capability tokenization, attestation token generation, and verification.
 
-## Planned Deliverables
+- `src/qhpi_calibration.ds`
+  Calibration contract tokenization and validity/expiration behavior.
 
-- provider-registry, q-job-protocol
-- Public APIs in src/
-- Test fixtures in tests/
-- Design and interface docs in docs/
+- `src/qhpi_job.ds`
+  Q job descriptor model, submission validation pipeline, no-clone boundary enforcement, and measurement result tokenization.
 
-## Repository Layout
+- `src/qhpi_errors.ds`
+  Deterministic provider failure mapping, signed error report tokenization, and deterministic escalation action.
 
-- src/ : core module implementations.
-- tests/ : deterministic unit/integration/conformance fixtures.
-- docs/ : architecture, protocol, and usage documentation.
-- State.toml : workspace manifest.
-- changelog.md : release and milestone notes.
+- `src/qhpi_tests.ds`
+  Behavioral tests for registration/attestation, calibration+job protocol, and deterministic error mapping.
 
-## Initial Module Plan
+- `src/main.ds`
+  Startup validation, smoke flows, and self-test entrypoints.
 
-- src/main.ds: project entrypoint and top-level orchestration.
-- src/contracts.ds: normative contract models and validators.
-- src/protocol.ds: wire/protocol semantics for external interfaces.
-- src/errors.ds: canonical error model and deterministic mapping.
-- src/tests.ds: local test harness entry surface.
+## Design Notes
 
-## Dependencies
-
-Current planned dependencies:
-
-- xdv-kernel, xdv-sdbm, xdv-runtime
-- dust runtime/toolchain packages as required by integration profile
-
-## Integration Contracts
-
-- Must preserve deterministic ordering semantics.
-- Must avoid implicit cross-domain state mutation.
-- Must emit structured metadata for replay and audit paths.
-- Must remain compatible with xdv-os build and boot/runtime contracts.
+- Provider identity and calibration are mandatory gates before job acceptance.
+- Job descriptors remain classical metadata and do not expose raw Q-state.
+- No-clone boundary is explicitly checked and mapped to stable error code.
+- Error mapping and escalation are deterministic for replay equivalence.
 
 ## Build
 
+```bash
 dust check xdv-qhpi/src
+```
 
 ## Test
 
-dust test xdv-qhpi/tests
+```bash
+dust check xdv-qhpi/src/qhpi_tests.ds
+dust check xdv-qhpi/tests/qhpi_e2e.ds
+```
 
-## Milestones
+## Integration Contracts
 
-1. M1: scaffold + contract models.
-2. M2: core pipeline implementation.
-3. M3: deterministic behavior and fixture hardening.
-4. M4: xdv-os integration and conformance gating.
-
-## Notes
-
-This project is initialized as a skeleton template and intentionally starts with minimal source implementation.
+- Preserve deterministic provider registration and attestation decisions.
+- Require valid calibration contract for new Q jobs.
+- Keep no-clone enforcement on submission path.
+- Emit stable error codes and deterministic escalation actions.

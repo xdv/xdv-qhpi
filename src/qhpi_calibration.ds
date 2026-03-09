@@ -1,0 +1,93 @@
+// File: qhpi_calibration.ds - This file is part of XDV
+// Copyright (c) 2026 Dust LLC, and Contributors
+// Description:
+//   xdv-qhpi: calibration contract model and validity checks.
+
+forge XdvQhpiCalibration {
+
+    const STATUS_OK: UInt32 = 0;
+
+    proc K::calibration_contract_token(contract_id: UInt64, provider_id: UInt64, calibration_profile_id: UInt64, valid_from_l: UInt64, valid_until_l: UInt64, error_bounds: UInt64, stability_metadata: UInt64, signature: UInt64) {
+        if contract_id == 0 {
+            return 0;
+        } else {
+            let provider_valid = XdvQhpiContracts::K::is_provider_id_valid(provider_id);
+            if provider_valid == STATUS_OK {
+                let window_valid = XdvQhpiContracts::K::is_calibration_window_valid(valid_from_l, valid_until_l);
+                if window_valid == STATUS_OK {
+                    if calibration_profile_id == 0 {
+                        return 0;
+                    } else {
+                        if error_bounds == 0 {
+                            return 0;
+                        } else {
+                            if stability_metadata == 0 {
+                                return 0;
+                            } else {
+                                if signature == 0 {
+                                    return 0;
+                                } else {
+                                    return (contract_id * 1000000000000) + (provider_id * 100000000) + (calibration_profile_id * 1000000) + (valid_from_l * 1000) + (valid_until_l - ((valid_until_l / 1000) * 1000));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    return 0;
+                }
+            } else {
+                return 0;
+            }
+        }
+    }
+
+    proc K::verify_calibration_contract(contract_id: UInt64, provider_id: UInt64, calibration_profile_id: UInt64, valid_from_l: UInt64, valid_until_l: UInt64, error_bounds: UInt64, stability_metadata: UInt64, signature: UInt64, presented_token: UInt64) {
+        let expected = calibration_contract_token(contract_id, provider_id, calibration_profile_id, valid_from_l, valid_until_l, error_bounds, stability_metadata, signature);
+        if expected == 0 {
+            return XdvQhpiContracts::K::STATUS_INVALID_CALIBRATION;
+        } else {
+            if expected == presented_token {
+                return STATUS_OK;
+            } else {
+                return XdvQhpiContracts::K::STATUS_INVALID_CALIBRATION;
+            }
+        }
+    }
+
+    proc K::can_accept_new_jobs(valid_from_l: UInt64, valid_until_l: UInt64, now_l: UInt64) {
+        return XdvQhpiContracts::K::is_calibration_active(valid_from_l, valid_until_l, now_l);
+    }
+
+    proc K::active_job_completion_allowed(valid_until_l: UInt64, now_l: UInt64, tolerance_window: UInt64) {
+        if valid_until_l == 0 {
+            return XdvQhpiContracts::K::STATUS_INVALID_CALIBRATION;
+        } else {
+            if tolerance_window == 0 {
+                if now_l <= valid_until_l {
+                    return STATUS_OK;
+                } else {
+                    return XdvQhpiContracts::K::STATUS_INVALID_CALIBRATION;
+                }
+            } else {
+                let tolerance_limit = valid_until_l + tolerance_window;
+                if now_l <= tolerance_limit {
+                    return STATUS_OK;
+                } else {
+                    return XdvQhpiContracts::K::STATUS_INVALID_CALIBRATION;
+                }
+            }
+        }
+    }
+
+    proc K::recalibration_required(valid_until_l: UInt64, now_l: UInt64) {
+        if valid_until_l == 0 {
+            return 1;
+        } else {
+            if now_l > valid_until_l {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+    }
+}

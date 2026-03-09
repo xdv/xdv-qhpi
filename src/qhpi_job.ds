@@ -1,0 +1,123 @@
+// File: qhpi_job.ds - This file is part of XDV
+// Copyright (c) 2026 Dust LLC, and Contributors
+// Description:
+//   xdv-qhpi: job submission and measurement protocol.
+
+forge XdvQhpiJob {
+
+    const STATUS_OK: UInt32 = 0;
+
+    proc K::job_descriptor_token(job_id: UInt64, process_id: UInt64, resource_contract_id: UInt64, calibration_contract_id: UInt64, logical_qubit_count: UInt64, circuit_pointer: UInt64, measurement_spec: UInt64, decoherence_budget: UInt64, capability_id: UInt64, logical_timestamp: UInt64) {
+        if job_id == 0 {
+            return 0;
+        } else {
+            if process_id == 0 {
+                return 0;
+            } else {
+                if resource_contract_id == 0 {
+                    return 0;
+                } else {
+                    if calibration_contract_id == 0 {
+                        return 0;
+                    } else {
+                        if logical_qubit_count == 0 {
+                            return 0;
+                        } else {
+                            if circuit_pointer == 0 {
+                                return 0;
+                            } else {
+                                let measure_valid = XdvQhpiContracts::K::is_measurement_spec_valid(measurement_spec);
+                                if measure_valid == STATUS_OK {
+                                    if decoherence_budget == 0 {
+                                        return 0;
+                                    } else {
+                                        if capability_id == 0 {
+                                            return 0;
+                                        } else {
+                                            if logical_timestamp == 0 {
+                                                return 0;
+                                            } else {
+                                                return (job_id * 1000000000000) + (process_id * 100000000) + (resource_contract_id * 1000000) + (logical_qubit_count * 10000) + (measurement_spec * 1000) + (logical_timestamp - ((logical_timestamp / 1000) * 1000));
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    return 0;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    proc K::validate_no_clone_boundary(requested_clone_count: UInt64, explicit_clone_contract: UInt64) {
+        if requested_clone_count == 0 {
+            return STATUS_OK;
+        } else {
+            if explicit_clone_contract == 1 {
+                return STATUS_OK;
+            } else {
+                return XdvQhpiContracts::K::STATUS_NO_CLONE_VIOLATION;
+            }
+        }
+    }
+
+    proc K::submit_job(provider_id: UInt64, provider_attestation_valid: UInt32, resource_contract_active: UInt32, calibration_valid_from_l: UInt64, calibration_valid_until_l: UInt64, now_l: UInt64, logical_qubit_count: UInt64, max_logical_qubits: UInt64, requested_gate_profile: UInt64, supported_gate_profile: UInt64, decoherence_budget: UInt64, requested_decoherence_cost: UInt64, measurement_spec: UInt64, requested_clone_count: UInt64, explicit_clone_contract: UInt64) {
+        let provider_valid = XdvQhpiContracts::K::is_provider_id_valid(provider_id);
+        if provider_valid == STATUS_OK {
+            if provider_attestation_valid == STATUS_OK {
+                if resource_contract_active == STATUS_OK {
+                    let calibration = XdvQhpiContracts::K::is_calibration_active(calibration_valid_from_l, calibration_valid_until_l, now_l);
+                    if calibration == STATUS_OK {
+                        if logical_qubit_count > max_logical_qubits {
+                            return XdvQhpiContracts::K::STATUS_RESOURCE_UNAVAILABLE;
+                        } else {
+                            if requested_gate_profile == supported_gate_profile {
+                                let decoherence_ok = XdvQhpiContracts::K::is_decoherence_budget_valid(decoherence_budget, requested_decoherence_cost);
+                                if decoherence_ok == STATUS_OK {
+                                    let measurement_ok = XdvQhpiContracts::K::is_measurement_spec_valid(measurement_spec);
+                                    if measurement_ok == STATUS_OK {
+                                        let no_clone = validate_no_clone_boundary(requested_clone_count, explicit_clone_contract);
+                                        if no_clone == STATUS_OK {
+                                            return STATUS_OK;
+                                        } else {
+                                            return no_clone;
+                                        }
+                                    } else {
+                                        return measurement_ok;
+                                    }
+                                } else {
+                                    return decoherence_ok;
+                                }
+                            } else {
+                                return XdvQhpiContracts::K::STATUS_UNSUPPORTED_GATE;
+                            }
+                        }
+                    } else {
+                        return calibration;
+                    }
+                } else {
+                    return XdvQhpiContracts::K::STATUS_RESOURCE_UNAVAILABLE;
+                }
+            } else {
+                return XdvQhpiContracts::K::STATUS_INVALID_ATTESTATION;
+            }
+        } else {
+            return provider_valid;
+        }
+    }
+
+    proc K::measurement_result_token(job_id: UInt64, classical_output: UInt64, error_metadata: UInt64, logical_timestamp: UInt64) {
+        if job_id == 0 {
+            return 0;
+        } else {
+            if logical_timestamp == 0 {
+                return 0;
+            } else {
+                return (logical_timestamp * 1000000000) + (job_id * 1000) + (classical_output * 10) + (error_metadata - ((error_metadata / 10) * 10));
+            }
+        }
+    }
+}

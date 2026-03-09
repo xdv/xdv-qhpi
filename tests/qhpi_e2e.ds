@@ -1,0 +1,10 @@
+// File: qhpi_e2e.ds - This file is part of XDV
+// Copyright (c) 2026 Dust LLC, and Contributors
+// Description:
+//   xdv-qhpi: aggregate test entrypoint for XDV-060 behavior checks.
+
+forge XdvQhpiE2E {
+    proc K::run_all_tests() {
+        return XdvQhpiTests::K::run_all_tests();
+    }
+}

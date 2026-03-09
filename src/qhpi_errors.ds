@@ -1,0 +1,109 @@
+// File: qhpi_errors.ds - This file is part of XDV
+// Copyright (c) 2026 Dust LLC, and Contributors
+// Description:
+//   xdv-qhpi: deterministic error mapping and signed report path.
+
+forge XdvQhpiErrors {
+
+    const STATUS_OK: UInt32 = 0;
+
+    const ESCALATE_NONE: UInt64 = 0;
+    const ESCALATE_RETRY: UInt64 = 1;
+    const ESCALATE_ROLLBACK: UInt64 = 2;
+    const ESCALATE_DEREGISTER_PROVIDER: UInt64 = 3;
+
+    proc K::map_provider_failure(calibration_valid: UInt32, resource_available: UInt32, gate_supported: UInt32, decoherence_ok: UInt32, measurement_ready: UInt32, no_clone_ok: UInt32) {
+        if no_clone_ok == STATUS_OK {
+            if calibration_valid == STATUS_OK {
+                if resource_available == STATUS_OK {
+                    if gate_supported == STATUS_OK {
+                        if decoherence_ok == STATUS_OK {
+                            if measurement_ready == STATUS_OK {
+                                return XdvQhpiContracts::K::Q_ERR_HARDWARE_FAILURE;
+                            } else {
+                                return XdvQhpiContracts::K::Q_ERR_MEASUREMENT_FAILURE;
+                            }
+                        } else {
+                            return XdvQhpiContracts::K::Q_ERR_DECOHERENCE_EXCEEDED;
+                        }
+                    } else {
+                        return XdvQhpiContracts::K::Q_ERR_GATE_UNSUPPORTED;
+                    }
+                } else {
+                    return XdvQhpiContracts::K::Q_ERR_RESOURCE_UNAVAILABLE;
+                }
+            } else {
+                return XdvQhpiContracts::K::Q_ERR_CALIBRATION_INVALID;
+            }
+        } else {
+            return XdvQhpiContracts::K::Q_ERR_NO_CLONE_VIOLATION;
+        }
+    }
+
+    proc K::error_report_token(job_id: UInt64, provider_id: UInt64, error_code: UInt64, error_metadata: UInt64, logical_timestamp: UInt64, signature: UInt64) {
+        if job_id == 0 {
+            return 0;
+        } else {
+            let provider_valid = XdvQhpiContracts::K::is_provider_id_valid(provider_id);
+            if provider_valid == STATUS_OK {
+                if error_code == 0 {
+                    return 0;
+                } else {
+                    if logical_timestamp == 0 {
+                        return 0;
+                    } else {
+                        if signature == 0 {
+                            return 0;
+                        } else {
+                            return (logical_timestamp * 1000000000) + (provider_id * 1000000) + (job_id * 1000) + (error_code - ((error_code / 1000) * 1000));
+                        }
+                    }
+                }
+            } else {
+                return 0;
+            }
+        }
+    }
+
+    proc K::escalation_action(error_code: UInt64, rollback_required: UInt64) {
+        if error_code == XdvQhpiContracts::K::Q_ERR_NO_CLONE_VIOLATION {
+            return ESCALATE_DEREGISTER_PROVIDER;
+        } else {
+            if error_code == XdvQhpiContracts::K::Q_ERR_HARDWARE_FAILURE {
+                if rollback_required == 1 {
+                    return ESCALATE_ROLLBACK;
+                } else {
+                    return ESCALATE_RETRY;
+                }
+            } else {
+                if error_code == XdvQhpiContracts::K::Q_ERR_RESOURCE_UNAVAILABLE {
+                    return ESCALATE_RETRY;
+                } else {
+                    if error_code == XdvQhpiContracts::K::Q_ERR_DECOHERENCE_EXCEEDED {
+                        if rollback_required == 1 {
+                            return ESCALATE_ROLLBACK;
+                        } else {
+                            return ESCALATE_RETRY;
+                        }
+                    } else {
+                        if error_code == XdvQhpiContracts::K::Q_ERR_CALIBRATION_INVALID {
+                            return ESCALATE_DEREGISTER_PROVIDER;
+                        } else {
+                            return ESCALATE_NONE;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    proc K::deterministic_error_digest(job_id: UInt64, provider_id: UInt64, error_code: UInt64, logical_timestamp: UInt64) {
+        let report = error_report_token(job_id, provider_id, error_code, 1, logical_timestamp, 1);
+        if report == 0 {
+            return 0;
+        } else {
+            let digest = (report * 97) + (error_code * 193);
+            return digest - ((digest / 1000000) * 1000000);
+        }
+    }
+}

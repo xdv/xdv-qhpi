@@ -1,0 +1,127 @@
+// File: qhpi_provider.ds - This file is part of XDV
+// Copyright (c) 2026 Dust LLC, and Contributors
+// Description:
+//   xdv-qhpi: provider registration and attestation flow for XDV-060.
+
+forge XdvQhpiProvider {
+
+    const STATUS_OK: UInt32 = 0;
+
+    proc K::provider_identity_token(provider_id: UInt64, firmware_measurement_hash: UInt64, hardware_topology: UInt64, max_logical_qubits: UInt64, supported_gate_profile: UInt64, decoherence_profile: UInt64, pq_signature: UInt64) {
+        let id_valid = XdvQhpiContracts::K::is_provider_id_valid(provider_id);
+        if id_valid == STATUS_OK {
+            let qubit_valid = XdvQhpiContracts::K::is_qubit_capacity_valid(max_logical_qubits);
+            if qubit_valid == STATUS_OK {
+                let gate_valid = XdvQhpiContracts::K::is_gate_profile_valid(supported_gate_profile);
+                if gate_valid == STATUS_OK {
+                    if firmware_measurement_hash == 0 {
+                        return 0;
+                    } else {
+                        if hardware_topology == 0 {
+                            return 0;
+                        } else {
+                            if decoherence_profile == 0 {
+                                return 0;
+                            } else {
+                                if pq_signature == 0 {
+                                    return 0;
+                                } else {
+                                    return (provider_id * 1000000000000) + (hardware_topology * 100000000) + (max_logical_qubits * 100000) + (supported_gate_profile * 1000) + (decoherence_profile * 10) + (firmware_measurement_hash - ((firmware_measurement_hash / 10) * 10));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    return 0;
+                }
+            } else {
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    proc K::register_provider(provider_id: UInt64, firmware_measurement_hash: UInt64, hardware_topology: UInt64, max_logical_qubits: UInt64, supported_gate_profile: UInt64, decoherence_profile: UInt64, pq_signature: UInt64, logical_timestamp: UInt64) {
+        if logical_timestamp == 0 {
+            return XdvQhpiContracts::K::STATUS_INVALID_PROVIDER;
+        } else {
+            let token = provider_identity_token(provider_id, firmware_measurement_hash, hardware_topology, max_logical_qubits, supported_gate_profile, decoherence_profile, pq_signature);
+            if token == 0 {
+                return XdvQhpiContracts::K::STATUS_INVALID_PROVIDER;
+            } else {
+                return STATUS_OK;
+            }
+        }
+    }
+
+    proc K::attestation_token(provider_id: UInt64, firmware_measurement_hash: UInt64, pq_signature: UInt64, attestation_nonce: UInt64, logical_timestamp: UInt64) {
+        let id_valid = XdvQhpiContracts::K::is_provider_id_valid(provider_id);
+        if id_valid == STATUS_OK {
+            if firmware_measurement_hash == 0 {
+                return 0;
+            } else {
+                if pq_signature == 0 {
+                    return 0;
+                } else {
+                    if attestation_nonce == 0 {
+                        return 0;
+                    } else {
+                        if logical_timestamp == 0 {
+                            return 0;
+                        } else {
+                            let mixed = (provider_id * 4099) + (firmware_measurement_hash * 97) + (pq_signature * 193) + (attestation_nonce * 17) + logical_timestamp;
+                            return mixed - ((mixed / 1000000) * 1000000);
+                        }
+                    }
+                }
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    proc K::verify_attestation(provider_id: UInt64, firmware_measurement_hash: UInt64, pq_signature: UInt64, attestation_nonce: UInt64, logical_timestamp: UInt64, presented_token: UInt64) {
+        let expected = attestation_token(provider_id, firmware_measurement_hash, pq_signature, attestation_nonce, logical_timestamp);
+        if expected == 0 {
+            return XdvQhpiContracts::K::STATUS_INVALID_ATTESTATION;
+        } else {
+            if presented_token == expected {
+                return STATUS_OK;
+            } else {
+                return XdvQhpiContracts::K::STATUS_INVALID_ATTESTATION;
+            }
+        }
+    }
+
+    proc K::provider_capability_token(provider_id: UInt64, max_logical_qubits: UInt64, supported_gate_profile: UInt64, calibration_profile_id: UInt64, max_circuit_depth: UInt64, measurement_modes: UInt64) {
+        let id_valid = XdvQhpiContracts::K::is_provider_id_valid(provider_id);
+        if id_valid == STATUS_OK {
+            let q_valid = XdvQhpiContracts::K::is_qubit_capacity_valid(max_logical_qubits);
+            if q_valid == STATUS_OK {
+                let gate_valid = XdvQhpiContracts::K::is_gate_profile_valid(supported_gate_profile);
+                if gate_valid == STATUS_OK {
+                    if calibration_profile_id == 0 {
+                        return 0;
+                    } else {
+                        if max_circuit_depth == 0 {
+                            return 0;
+                        } else {
+                            if measurement_modes == 0 {
+                                return 0;
+                            } else {
+                                return (provider_id * 1000000000000) + (max_logical_qubits * 100000000) + (supported_gate_profile * 1000000) + (max_circuit_depth * 1000) + (measurement_modes * 10) + (calibration_profile_id - ((calibration_profile_id / 10) * 10));
+                            }
+                        }
+                    }
+                } else {
+                    return 0;
+                }
+            } else {
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+    }
+}

@@ -1,0 +1,164 @@
+// File: qhpi_contracts.ds - This file is part of XDV
+// Copyright (c) 2026 Dust LLC, and Contributors
+// Description:
+//   xdv-qhpi: XDV-060 constants, validators, and stable error codes.
+
+forge XdvQhpiContracts {
+
+    const STATUS_OK: UInt32 = 0;
+    const STATUS_INVALID_PROVIDER: UInt32 = 1;
+    const STATUS_INVALID_ATTESTATION: UInt32 = 2;
+    const STATUS_INVALID_CAPABILITY: UInt32 = 3;
+    const STATUS_INVALID_CALIBRATION: UInt32 = 4;
+    const STATUS_INVALID_JOB: UInt32 = 5;
+    const STATUS_DECOHERENCE_EXCEEDED: UInt32 = 6;
+    const STATUS_RESOURCE_UNAVAILABLE: UInt32 = 7;
+    const STATUS_UNSUPPORTED_GATE: UInt32 = 8;
+    const STATUS_MEASUREMENT_FAILURE: UInt32 = 9;
+    const STATUS_NO_CLONE_VIOLATION: UInt32 = 10;
+
+    const Q_ERR_DECOHERENCE_EXCEEDED: UInt64 = 1001;
+    const Q_ERR_CALIBRATION_INVALID: UInt64 = 1002;
+    const Q_ERR_RESOURCE_UNAVAILABLE: UInt64 = 1003;
+    const Q_ERR_HARDWARE_FAILURE: UInt64 = 1004;
+    const Q_ERR_GATE_UNSUPPORTED: UInt64 = 1005;
+    const Q_ERR_MEASUREMENT_FAILURE: UInt64 = 1006;
+    const Q_ERR_NO_CLONE_VIOLATION: UInt64 = 1007;
+
+    const PROVIDER_STATE_REGISTERED: UInt64 = 1;
+    const PROVIDER_STATE_ATTESTED: UInt64 = 2;
+    const PROVIDER_STATE_ACTIVE: UInt64 = 3;
+
+    const MEASUREMENT_BASIS_Z: UInt64 = 1;
+    const MEASUREMENT_BASIS_X: UInt64 = 2;
+    const MEASUREMENT_BASIS_Y: UInt64 = 3;
+
+    proc K::is_provider_id_valid(provider_id: UInt64) {
+        if provider_id == 0 {
+            return STATUS_INVALID_PROVIDER;
+        } else {
+            return STATUS_OK;
+        }
+    }
+
+    proc K::is_provider_state_valid(state: UInt64) {
+        if state == PROVIDER_STATE_REGISTERED {
+            return STATUS_OK;
+        } else {
+            if state == PROVIDER_STATE_ATTESTED {
+                return STATUS_OK;
+            } else {
+                if state == PROVIDER_STATE_ACTIVE {
+                    return STATUS_OK;
+                } else {
+                    return STATUS_INVALID_PROVIDER;
+                }
+            }
+        }
+    }
+
+    proc K::is_qubit_capacity_valid(max_logical_qubits: UInt64) {
+        if max_logical_qubits == 0 {
+            return STATUS_INVALID_CAPABILITY;
+        } else {
+            return STATUS_OK;
+        }
+    }
+
+    proc K::is_gate_profile_valid(supported_gate_profile: UInt64) {
+        if supported_gate_profile == 0 {
+            return STATUS_INVALID_CAPABILITY;
+        } else {
+            return STATUS_OK;
+        }
+    }
+
+    proc K::is_measurement_spec_valid(measurement_spec: UInt64) {
+        if measurement_spec == MEASUREMENT_BASIS_Z {
+            return STATUS_OK;
+        } else {
+            if measurement_spec == MEASUREMENT_BASIS_X {
+                return STATUS_OK;
+            } else {
+                if measurement_spec == MEASUREMENT_BASIS_Y {
+                    return STATUS_OK;
+                } else {
+                    return STATUS_MEASUREMENT_FAILURE;
+                }
+            }
+        }
+    }
+
+    proc K::is_calibration_window_valid(valid_from_l: UInt64, valid_until_l: UInt64) {
+        if valid_from_l == 0 {
+            return STATUS_INVALID_CALIBRATION;
+        } else {
+            if valid_until_l == 0 {
+                return STATUS_INVALID_CALIBRATION;
+            } else {
+                if valid_until_l < valid_from_l {
+                    return STATUS_INVALID_CALIBRATION;
+                } else {
+                    return STATUS_OK;
+                }
+            }
+        }
+    }
+
+    proc K::is_calibration_active(valid_from_l: UInt64, valid_until_l: UInt64, now_l: UInt64) {
+        let window_valid = is_calibration_window_valid(valid_from_l, valid_until_l);
+        if window_valid == STATUS_OK {
+            if now_l < valid_from_l {
+                return STATUS_INVALID_CALIBRATION;
+            } else {
+                if now_l > valid_until_l {
+                    return STATUS_INVALID_CALIBRATION;
+                } else {
+                    return STATUS_OK;
+                }
+            }
+        } else {
+            return window_valid;
+        }
+    }
+
+    proc K::is_decoherence_budget_valid(decoherence_budget: UInt64, requested_cost: UInt64) {
+        if decoherence_budget == 0 {
+            return STATUS_DECOHERENCE_EXCEEDED;
+        } else {
+            if requested_cost > decoherence_budget {
+                return STATUS_DECOHERENCE_EXCEEDED;
+            } else {
+                return STATUS_OK;
+            }
+        }
+    }
+
+    proc K::status_to_error_code(status: UInt32) {
+        if status == STATUS_DECOHERENCE_EXCEEDED {
+            return Q_ERR_DECOHERENCE_EXCEEDED;
+        } else {
+            if status == STATUS_INVALID_CALIBRATION {
+                return Q_ERR_CALIBRATION_INVALID;
+            } else {
+                if status == STATUS_RESOURCE_UNAVAILABLE {
+                    return Q_ERR_RESOURCE_UNAVAILABLE;
+                } else {
+                    if status == STATUS_UNSUPPORTED_GATE {
+                        return Q_ERR_GATE_UNSUPPORTED;
+                    } else {
+                        if status == STATUS_MEASUREMENT_FAILURE {
+                            return Q_ERR_MEASUREMENT_FAILURE;
+                        } else {
+                            if status == STATUS_NO_CLONE_VIOLATION {
+                                return Q_ERR_NO_CLONE_VIOLATION;
+                            } else {
+                                return Q_ERR_HARDWARE_FAILURE;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

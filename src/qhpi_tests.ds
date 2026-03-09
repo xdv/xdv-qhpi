@@ -1,0 +1,225 @@
+// File: qhpi_tests.ds - This file is part of XDV
+// Copyright (c) 2026 Dust LLC, and Contributors
+// Description:
+//   xdv-qhpi: XDV-060 behavior tests.
+
+forge XdvQhpiTests {
+
+    const TEST_PASS: UInt32 = 0;
+    const TEST_FAIL: UInt32 = 1;
+
+    const STATUS_OK: UInt32 = 0;
+
+    const Q_ERR_DECOHERENCE_EXCEEDED: UInt64 = 1001;
+    const Q_ERR_CALIBRATION_INVALID: UInt64 = 1002;
+    const Q_ERR_RESOURCE_UNAVAILABLE: UInt64 = 1003;
+    const Q_ERR_GATE_UNSUPPORTED: UInt64 = 1005;
+    const Q_ERR_MEASUREMENT_FAILURE: UInt64 = 1006;
+    const Q_ERR_NO_CLONE_VIOLATION: UInt64 = 1007;
+
+    proc K::expect_u32(actual: UInt32, expected: UInt32) {
+        if actual == expected {
+            return TEST_PASS;
+        } else {
+            return TEST_FAIL;
+        }
+    }
+
+    proc K::expect_u64(actual: UInt64, expected: UInt64) {
+        if actual == expected {
+            return TEST_PASS;
+        } else {
+            return TEST_FAIL;
+        }
+    }
+
+    proc K::combine(lhs: UInt32, rhs: UInt32) {
+        if lhs == TEST_PASS {
+            return rhs;
+        } else {
+            return TEST_FAIL;
+        }
+    }
+
+    proc K::test_provider_registration_and_attestation() {
+        let reg = XdvQhpiProvider::K::register_provider(11, 991, 5, 64, 3, 9, 777, 10);
+        let bad_reg = XdvQhpiProvider::K::register_provider(0, 991, 5, 64, 3, 9, 777, 10);
+
+        let att = XdvQhpiProvider::K::attestation_token(11, 991, 777, 40, 10);
+        let verify = XdvQhpiProvider::K::verify_attestation(11, 991, 777, 40, 10, att);
+        let verify_bad = XdvQhpiProvider::K::verify_attestation(11, 991, 777, 40, 10, att + 1);
+
+        let cap = XdvQhpiProvider::K::provider_capability_token(11, 64, 3, 12, 400, 7);
+
+        let t1 = expect_u32(reg, STATUS_OK);
+        let t2 = expect_u32(verify, STATUS_OK);
+
+        let u1 = combine(t1, t2);
+
+        if bad_reg == STATUS_OK {
+            return TEST_FAIL;
+        } else {
+            if verify_bad == STATUS_OK {
+                return TEST_FAIL;
+            } else {
+                if cap == 0 {
+                    return TEST_FAIL;
+                } else {
+                    return u1;
+                }
+            }
+        }
+    }
+
+    proc K::test_calibration_and_job_protocol() {
+        let ctoken = XdvQhpiCalibration::K::calibration_contract_token(44, 11, 12, 100, 200, 3, 4, 777);
+        let cverify = XdvQhpiCalibration::K::verify_calibration_contract(44, 11, 12, 100, 200, 3, 4, 777, ctoken);
+        let can_accept = XdvQhpiCalibration::K::can_accept_new_jobs(100, 200, 150);
+        let needs_recal = XdvQhpiCalibration::K::recalibration_required(200, 250);
+        let can_finish = XdvQhpiCalibration::K::active_job_completion_allowed(200, 205, 10);
+
+        let jtoken = XdvQhpiJob::K::job_descriptor_token(900, 7, 30, 44, 12, 5001, 1, 40, 17, 150);
+
+        let submit_ok = XdvQhpiJob::K::submit_job(
+            11,
+            STATUS_OK,
+            STATUS_OK,
+            100,
+            200,
+            150,
+            12,
+            64,
+            3,
+            3,
+            40,
+            20,
+            1,
+            0,
+            0
+        );
+
+        let submit_bad_gate = XdvQhpiJob::K::submit_job(
+            11,
+            STATUS_OK,
+            STATUS_OK,
+            100,
+            200,
+            150,
+            12,
+            64,
+            5,
+            3,
+            40,
+            20,
+            1,
+            0,
+            0
+        );
+
+        let submit_clone_violation = XdvQhpiJob::K::submit_job(
+            11,
+            STATUS_OK,
+            STATUS_OK,
+            100,
+            200,
+            150,
+            12,
+            64,
+            3,
+            3,
+            40,
+            20,
+            1,
+            1,
+            0
+        );
+
+        let mtoken = XdvQhpiJob::K::measurement_result_token(900, 1, 0, 160);
+
+        let t1 = expect_u32(cverify, STATUS_OK);
+        let t2 = expect_u32(can_accept, STATUS_OK);
+        let t3 = expect_u32(can_finish, STATUS_OK);
+        let t4 = expect_u32(submit_ok, STATUS_OK);
+
+        let u1 = combine(t1, t2);
+        let u2 = combine(u1, t3);
+        let u3 = combine(u2, t4);
+
+        if ctoken == 0 {
+            return TEST_FAIL;
+        } else {
+            if jtoken == 0 {
+                return TEST_FAIL;
+            } else {
+                if submit_bad_gate == XdvQhpiContracts::K::STATUS_UNSUPPORTED_GATE {
+                    if submit_clone_violation == XdvQhpiContracts::K::STATUS_NO_CLONE_VIOLATION {
+                        if needs_recal == 1 {
+                            if mtoken == 0 {
+                                return TEST_FAIL;
+                            } else {
+                                return u3;
+                            }
+                        } else {
+                            return TEST_FAIL;
+                        }
+                    } else {
+                        return TEST_FAIL;
+                    }
+                } else {
+                    return TEST_FAIL;
+                }
+            }
+        }
+    }
+
+    proc K::test_deterministic_error_mapping() {
+        let e1 = XdvQhpiErrors::K::map_provider_failure(1, 0, 0, 0, 0, 0);
+        let e2 = XdvQhpiErrors::K::map_provider_failure(0, 1, 0, 0, 0, 0);
+        let e3 = XdvQhpiErrors::K::map_provider_failure(0, 0, 1, 0, 0, 0);
+        let e4 = XdvQhpiErrors::K::map_provider_failure(0, 0, 0, 1, 0, 0);
+        let e5 = XdvQhpiErrors::K::map_provider_failure(0, 0, 0, 0, 1, 0);
+        let e6 = XdvQhpiErrors::K::map_provider_failure(0, 0, 0, 0, 0, 1);
+
+        let d1 = XdvQhpiErrors::K::deterministic_error_digest(900, 11, e1, 200);
+        let d2 = XdvQhpiErrors::K::deterministic_error_digest(900, 11, e1, 200);
+
+        let report = XdvQhpiErrors::K::error_report_token(900, 11, e1, 6, 200, 123);
+
+        let t1 = expect_u64(e1, Q_ERR_CALIBRATION_INVALID);
+        let t2 = expect_u64(e2, Q_ERR_RESOURCE_UNAVAILABLE);
+        let t3 = expect_u64(e3, Q_ERR_GATE_UNSUPPORTED);
+        let t4 = expect_u64(e4, Q_ERR_DECOHERENCE_EXCEEDED);
+        let t5 = expect_u64(e5, Q_ERR_MEASUREMENT_FAILURE);
+        let t6 = expect_u64(e6, Q_ERR_NO_CLONE_VIOLATION);
+        let t7 = expect_u64(d1, d2);
+
+        let u1 = combine(t1, t2);
+        let u2 = combine(u1, t3);
+        let u3 = combine(u2, t4);
+        let u4 = combine(u3, t5);
+        let u5 = combine(u4, t6);
+        let u6 = combine(u5, t7);
+
+        if report == 0 {
+            return TEST_FAIL;
+        } else {
+            let esc1 = XdvQhpiErrors::K::escalation_action(Q_ERR_NO_CLONE_VIOLATION, 1);
+            let esc2 = XdvQhpiErrors::K::escalation_action(Q_ERR_RESOURCE_UNAVAILABLE, 0);
+            if esc1 == XdvQhpiErrors::K::ESCALATE_DEREGISTER_PROVIDER {
+                if esc2 == XdvQhpiErrors::K::ESCALATE_RETRY {
+                    return u6;
+                } else {
+                    return TEST_FAIL;
+                }
+            } else {
+                return TEST_FAIL;
+            }
+        }
+    }
+
+    proc K::run_all_tests() {
+        let t1 = test_provider_registration_and_attestation();
+        let t2 = combine(t1, test_calibration_and_job_protocol());
+        return combine(t2, test_deterministic_error_mapping());
+    }
+}

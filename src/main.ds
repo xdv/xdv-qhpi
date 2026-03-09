@@ -1,2 +1,120 @@
-﻿# XDV Q Hardware Provider Interface bootstrap surface
-# TODO: implement module entrypoint
+// File: main.ds - This file is part of XDV
+// Copyright (c) 2026 Dust LLC, and Contributors
+// Description:
+//   xdv-qhpi: top-level entrypoints for XDV-060.
+
+forge XdvQhpiMain {
+
+    const STATUS_OK: UInt32 = 0;
+    const STATUS_BOOTSTRAP_FAILED: UInt32 = 1;
+
+    proc K::startup_contract_validation() {
+        let provider = XdvQhpiContracts::K::is_provider_id_valid(11);
+        if provider == STATUS_OK {
+            let qubits = XdvQhpiContracts::K::is_qubit_capacity_valid(64);
+            if qubits == STATUS_OK {
+                let gate = XdvQhpiContracts::K::is_gate_profile_valid(3);
+                if gate == STATUS_OK {
+                    return STATUS_OK;
+                } else {
+                    return STATUS_BOOTSTRAP_FAILED;
+                }
+            } else {
+                return STATUS_BOOTSTRAP_FAILED;
+            }
+        } else {
+            return STATUS_BOOTSTRAP_FAILED;
+        }
+    }
+
+    proc K::smoke_provider_registration_and_attestation() {
+        let reg = XdvQhpiProvider::K::register_provider(11, 991, 5, 64, 3, 9, 777, 10);
+        if reg == STATUS_OK {
+            let att = XdvQhpiProvider::K::attestation_token(11, 991, 777, 40, 10);
+            if att == 0 {
+                return STATUS_BOOTSTRAP_FAILED;
+            } else {
+                let verify = XdvQhpiProvider::K::verify_attestation(11, 991, 777, 40, 10, att);
+                if verify == STATUS_OK {
+                    return STATUS_OK;
+                } else {
+                    return STATUS_BOOTSTRAP_FAILED;
+                }
+            }
+        } else {
+            return STATUS_BOOTSTRAP_FAILED;
+        }
+    }
+
+    proc K::smoke_calibration_and_job_protocol() {
+        let cal = XdvQhpiCalibration::K::calibration_contract_token(44, 11, 12, 100, 200, 3, 4, 777);
+        if cal == 0 {
+            return STATUS_BOOTSTRAP_FAILED;
+        } else {
+            let submit = XdvQhpiJob::K::submit_job(
+                11,
+                STATUS_OK,
+                STATUS_OK,
+                100,
+                200,
+                150,
+                12,
+                64,
+                3,
+                3,
+                40,
+                20,
+                1,
+                0,
+                0
+            );
+            if submit == STATUS_OK {
+                return STATUS_OK;
+            } else {
+                return STATUS_BOOTSTRAP_FAILED;
+            }
+        }
+    }
+
+    proc K::smoke_error_mapping() {
+        let error_code = XdvQhpiErrors::K::map_provider_failure(0, 1, 0, 0, 0, 0);
+        if error_code == XdvQhpiContracts::K::Q_ERR_RESOURCE_UNAVAILABLE {
+            let report = XdvQhpiErrors::K::error_report_token(900, 11, error_code, 6, 200, 123);
+            if report == 0 {
+                return STATUS_BOOTSTRAP_FAILED;
+            } else {
+                return STATUS_OK;
+            }
+        } else {
+            return STATUS_BOOTSTRAP_FAILED;
+        }
+    }
+
+    proc K::run_self_tests() {
+        return XdvQhpiTests::K::run_all_tests();
+    }
+
+    proc K::bootstrap() {
+        let startup = startup_contract_validation();
+        if startup == STATUS_OK {
+            let provider = smoke_provider_registration_and_attestation();
+            if provider == STATUS_OK {
+                let protocol = smoke_calibration_and_job_protocol();
+                if protocol == STATUS_OK {
+                    let errors = smoke_error_mapping();
+                    if errors == STATUS_OK {
+                        return STATUS_OK;
+                    } else {
+                        return STATUS_BOOTSTRAP_FAILED;
+                    }
+                } else {
+                    return STATUS_BOOTSTRAP_FAILED;
+                }
+            } else {
+                return STATUS_BOOTSTRAP_FAILED;
+            }
+        } else {
+            return STATUS_BOOTSTRAP_FAILED;
+        }
+    }
+}
